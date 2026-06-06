@@ -15,21 +15,43 @@ class ProfileController extends Controller
         ]);
     }
 
-    // UPDATE PROFILE
+    // UPDATE PROFILE (ONLY ONE FUNCTION)
     public function update(Request $request)
     {
         $user = $request->user();
 
         $request->validate([
             'username' => 'nullable|string|unique:users,username,' . $user->id,
+            'name' => 'nullable|string',
             'bio' => 'nullable|string|max:500',
+            'content_type' => 'nullable|string',
+            'interests' => 'nullable|array',
         ]);
 
-        $user->username = $request->username ?? $user->username;
-        $user->bio = $request->bio ?? $user->bio;
+        // Update basic fields
+        if ($request->has('username')) {
+            $user->username = $request->username;
+        }
 
-        // ⭐ keep creator growth logic ready
-        if (!$user->points) {
+        if ($request->has('name')) {
+            $user->name = $request->name;
+        }
+
+        if ($request->has('bio')) {
+            $user->bio = $request->bio;
+        }
+
+        // Creator Growth fields
+        if ($request->has('content_type')) {
+            $user->content_type = $request->content_type;
+        }
+
+        if ($request->has('interests')) {
+            $user->interests = $request->interests;
+        }
+
+        // ensure points exist (safe fallback)
+        if ($user->points === null) {
             $user->points = 0;
         }
 

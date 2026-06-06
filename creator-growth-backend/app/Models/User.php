@@ -11,7 +11,7 @@ class User extends Authenticatable
     use HasApiTokens, Notifiable;
 
     /**
-     * The attributes that are mass assignable.
+     * Mass assignable fields
      */
     protected $fillable = [
         'name',
@@ -20,16 +20,30 @@ class User extends Authenticatable
         'username',
         'bio',
         'profile_image',
+
+        // ⭐ Creator Growth System
+        'content_type',
+        'interests',
+
+        // ⭐ Gamification
         'points',
         'followers_count',
         'following_count',
     ];
 
     /**
-     * The attributes that should be hidden.
+     * Hidden fields
      */
     protected $hidden = [
         'password',
         'remember_token',
+    ];
+
+    /**
+     * Cast special fields
+     */
+    protected $casts = [
+        'interests' => 'array',   // ⭐ IMPORTANT for feed system
+        'email_verified_at' => 'datetime',
     ];
 }
