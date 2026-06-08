@@ -10,7 +10,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__ . '/../routes/web.php',
 
-        // ✅ API routes (make sure routes/api.php exists)
+        // API Routes
         api: __DIR__ . '/../routes/api.php',
 
         commands: __DIR__ . '/../routes/console.php',
@@ -20,16 +20,20 @@ return Application::configure(basePath: dirname(__DIR__))
 
     ->withMiddleware(function (Middleware $middleware): void {
 
-        // ✅ Sanctum stateful authentication for API (required for Flutter / SPA auth)
+        // Sanctum Authentication
         $middleware->api(prepend: [
             EnsureFrontendRequestsAreStateful::class,
         ]);
 
-        // (Optional but safe defaults Laravel uses internally)
+        // Route Model Binding
         $middleware->api(append: [
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ]);
 
+        // Admin Middleware Alias
+        $middleware->alias([
+            'admin' => \App\Http\Middleware\AdminMiddleware::class,
+        ]);
     })
 
     ->withExceptions(function (Exceptions $exceptions): void {

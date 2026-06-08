@@ -12,7 +12,9 @@ class CreatorTask extends Model
         'link',
         'instructions',
         'reward_credits',
+        'category',
         'status',
+        'admin_status'
     ];
 
     // 🔥 Relationship (important for feed later)

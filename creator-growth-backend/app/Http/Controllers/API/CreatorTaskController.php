@@ -32,14 +32,13 @@ class CreatorTaskController extends Controller
             ['credits' => 100]
         );
 
-        // Check balance
         if ($wallet->credits < $request->reward_credits) {
             return response()->json([
                 'message' => 'Not enough credits'
             ], 400);
         }
 
-        // Deduct credits (escrow system)
+        // Deduct credits
         CreatorCredit::deductCredits($userId, $request->reward_credits);
 
         // Create task
@@ -60,33 +59,46 @@ class CreatorTaskController extends Controller
     }
 
     // =========================
-    // PERSONALIZED FEED (IMPORTANT UPDATE)
+    // ADVANCED FEED (FIXED)
     // =========================
     public function index(Request $request)
     {
         $user = $request->user();
 
-        $query = CreatorTask::with('user:id,name')
-            ->where('status', 'open');
+        $tasks = CreatorTask::with('user:id,name')
+            ->where('status', 'open')
+            ->where('admin_status', 'approved')
+            ->latest()
+            ->get();
 
-        // 🎯 PERSONALIZED FEED BASED ON INTERESTS
-        if (!empty($user->interests)) {
+        $scoredTasks = $tasks->map(function ($task) use ($user) {
 
-            $query->where(function ($q) use ($user) {
+            $score = 0;
 
-                $q->whereIn('category', $user->interests)
-                    ->orWhereNull('category');
-            });
-        }
+            // 💰 Reward weight
+            $score += $task->reward_credits;
 
-        // 🔥 BOOST HIGH REWARD TASKS
-        $query->orderBy('reward_credits', 'desc');
+            // ⏱️ Recency boost
+            $hoursOld = now()->diffInHours($task->created_at);
+            $score += max(0, 50 - $hoursOld);
 
-        $tasks = $query->paginate(20);
+            // 🎯 Interest match boost
+            if (!empty($user->interests) && $task->category) {
+                if (in_array($task->category, $user->interests)) {
+                    $score += 100;
+                }
+            }
+
+            $task->score = $score;
+
+            return $task;
+        });
+
+        $sorted = $scoredTasks->sortByDesc('score')->values();
 
         return response()->json([
-            'message' => 'Personalized task feed loaded 🚀',
-            'tasks' => $tasks
+            'message' => 'Advanced feed loaded 🚀',
+            'tasks' => $sorted
         ]);
     }
 
@@ -105,7 +117,7 @@ class CreatorTaskController extends Controller
     }
 
     // =========================
-    // COMPLETE TASK (FULL SAFE ENGINE)
+    // COMPLETE TASK
     // =========================
     public function completeTask(Request $request, $taskId)
     {
@@ -143,13 +155,13 @@ class CreatorTaskController extends Controller
             'proof' => $request->proof
         ]);
 
-        // 💰 Give credits to helper
+        // 💰 reward credits
         CreatorCredit::addCredits(
             $userId,
             $task->reward_credits
         );
 
-        // 🏆 Give points
+        // 🏆 reward points
         CreatorPoint::addPoints(
             $userId,
             10

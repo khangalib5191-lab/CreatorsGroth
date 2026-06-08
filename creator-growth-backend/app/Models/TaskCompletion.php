@@ -10,5 +10,6 @@ class TaskCompletion extends Model
         'task_id',
         'user_id',
         'proof',
+        'status'
     ];
 }

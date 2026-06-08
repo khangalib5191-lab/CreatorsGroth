@@ -20,15 +20,12 @@ class User extends Authenticatable
         'username',
         'bio',
         'profile_image',
-
-        // ⭐ Creator Growth System
         'content_type',
         'interests',
-
-        // ⭐ Gamification
         'points',
         'followers_count',
         'following_count',
+        'role',
     ];
 
     /**

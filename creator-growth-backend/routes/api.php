@@ -15,6 +15,7 @@ use App\Http\Controllers\API\StatusController;
 use App\Http\Controllers\API\FollowController;
 use App\Http\Controllers\API\GroupMessageController;
 use App\Http\Controllers\API\GroupController;
+use App\Http\Controllers\API\AdminController;
 use App\Http\Controllers\API\ChatController;
 use App\Http\Controllers\API\CreatorCreditController;
 use App\Http\Controllers\API\CreatorPointController;
@@ -144,4 +145,33 @@ Route::middleware('auth:sanctum')->group(function () {
     // 🔥 IMPORTANT: TASK COMPLETION (ADDED)
     Route::post('/tasks/{id}/complete', [CreatorTaskController::class, 'completeTask']);
 
+});
+
+
+// Admin routes 
+Route::middleware(['auth:sanctum', 'admin'])->group(function () {
+
+    // 👑 Dashboard
+    Route::get('/admin/dashboard', [AdminController::class, 'dashboard']);
+
+    // 👥 Users
+    Route::get('/admin/users', [AdminController::class, 'users']);
+    Route::get('/admin/users/{id}', [AdminController::class, 'showUser']);
+
+    // 🚫 Ban / Unban
+    Route::post('/admin/users/{id}/ban', [AdminController::class, 'banUser']);
+    Route::post('/admin/users/{id}/unban', [AdminController::class, 'unbanUser']);
+
+    // ❌ Delete user
+    Route::delete('/admin/users/{id}', [AdminController::class, 'deleteUser']);
+
+    Route::get('/admin/tasks/pending', [AdminController::class, 'pendingTasks']);
+    Route::post('/admin/tasks/{id}/approve', [AdminController::class, 'approveTask']);
+    Route::post('/admin/tasks/{id}/reject', [AdminController::class, 'rejectTask']);
+
+    Route::post('/admin/users/{id}/credits', [AdminController::class, 'adjustCredits']);
+
+    Route::get('/admin/completions/pending', [AdminController::class, 'pendingCompletions']);
+    Route::post('/admin/completions/{id}/approve', [AdminController::class, 'approveCompletion']);
+    Route::post('/admin/completions/{id}/reject', [AdminController::class, 'rejectCompletion']);
 });
