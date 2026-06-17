@@ -65,7 +65,7 @@ class ReviewCardWidget extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              Text('Submitted proof available for review.',
+              const Text('Submitted proof available for review.',
                   style: TextStyle(color: AppTheme.textSecondary)),
               const SizedBox(height: 12),
               Row(children: [

@@ -1,29 +1,40 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../core/providers/app_providers.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../app/presentation/app_notifiers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/routes/app_router.dart';
-import '../../core/services/dummy_data.dart';
 import '../../core/models/community_model.dart';
 
-class CommentsPage extends StatefulWidget {
+class CommentsPage extends ConsumerStatefulWidget {
   final String postId;
   final PostModel post;
 
   const CommentsPage({super.key, required this.postId, required this.post});
 
   @override
-  State<CommentsPage> createState() => _CommentsPageState();
+  ConsumerState<CommentsPage> createState() => _CommentsPageState();
 }
 
-class _CommentsPageState extends State<CommentsPage> {
+class _CommentsPageState extends ConsumerState<CommentsPage> {
   final TextEditingController _commentController = TextEditingController();
-  late List<CommentModel> comments;
+  List<CommentModel> comments = [];
+  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    comments = DummyData.getPostComments(widget.postId);
+    _loadComments();
+  }
+
+  Future<void> _loadComments() async {
+    final loaded =
+        await ref.read(communityNotifierProvider.notifier).getComments(widget.postId);
+    if (mounted) {
+      setState(() {
+        comments = loaded;
+        _loading = false;
+      });
+    }
   }
 
   @override
@@ -35,8 +46,7 @@ class _CommentsPageState extends State<CommentsPage> {
   void _addComment() {
     if (_commentController.text.trim().isEmpty) return;
 
-    final userProvider = Provider.of<UserProvider>(context, listen: false);
-    final currentUser = userProvider.currentUser;
+    final currentUser = ref.read(authNotifierProvider).user;
 
     // FIX: Null safety check
     if (currentUser == null) {
@@ -90,7 +100,9 @@ class _CommentsPageState extends State<CommentsPage> {
       body: Column(
         children: [
           Expanded(
-            child: ListView(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : ListView(
               padding: const EdgeInsets.all(16),
               children: [
                 // Original post preview
@@ -246,7 +258,7 @@ class _CommentsPageState extends State<CommentsPage> {
           // Comment input box
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               border: Border(top: BorderSide(color: AppTheme.backgroundColor)),
               color: Colors.white,
             ),
@@ -260,7 +272,7 @@ class _CommentsPageState extends State<CommentsPage> {
                       hintStyle: const TextStyle(color: AppTheme.textSecondary),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide(color: AppTheme.backgroundColor),
+                        borderSide: const BorderSide(color: AppTheme.backgroundColor),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),

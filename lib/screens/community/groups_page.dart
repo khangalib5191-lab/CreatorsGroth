@@ -1,23 +1,35 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../app/presentation/app_notifiers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/routes/app_router.dart';
-import '../../core/services/dummy_data.dart';
 import '../../core/models/community_model.dart';
 
-class GroupsPage extends StatefulWidget {
+class GroupsPage extends ConsumerStatefulWidget {
   const GroupsPage({super.key});
 
   @override
-  State<GroupsPage> createState() => _GroupsPageState();
+  ConsumerState<GroupsPage> createState() => _GroupsPageState();
 }
 
-class _GroupsPageState extends State<GroupsPage> {
-  late List<GroupModel> userGroups;
+class _GroupsPageState extends ConsumerState<GroupsPage> {
+  List<GroupModel> userGroups = [];
+  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    userGroups = DummyData.groups;
+    _loadGroups();
+  }
+
+  Future<void> _loadGroups() async {
+    final groups = await ref.read(communityNotifierProvider.notifier).getGroups();
+    if (mounted) {
+      setState(() {
+        userGroups = groups;
+        _loading = false;
+      });
+    }
   }
 
   void _createGroup() {
@@ -46,7 +58,9 @@ class _GroupsPageState extends State<GroupsPage> {
           ),
         ],
       ),
-      body: userGroups.isEmpty
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : userGroups.isEmpty
           ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,

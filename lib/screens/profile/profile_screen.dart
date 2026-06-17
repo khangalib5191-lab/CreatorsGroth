@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/providers/app_providers.dart';
+import '../../app/presentation/app_notifiers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/routes/app_router.dart';
 import '../../core/models/user_model.dart';
-import '../../core/services/dummy_data.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends ConsumerWidget {
   final UserModel? user;
   final String? userId;
 
@@ -18,14 +17,12 @@ class ProfileScreen extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final currentUser = Provider.of<UserProvider>(context).currentUser!;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentUser = ref.watch(authNotifierProvider).user!;
     final displayedUser = user ??
         (userId != null
-            ? DummyData.suggestedCreators.firstWhere(
-                (u) => u.id == userId,
-                orElse: () => currentUser,
-              )
+            ? ref.watch(authNotifierProvider.notifier).getUserById(userId!) ??
+                currentUser
             : currentUser);
     final isCurrentUser = displayedUser.id == currentUser.id;
 
@@ -96,7 +93,7 @@ class ProfileScreen extends StatelessWidget {
                       Text(
                         '@${displayedUser.username.replaceAll('@', '')}',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.8),
+                          color: Colors.white.withValues(alpha: 0.8),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -106,7 +103,7 @@ class ProfileScreen extends StatelessWidget {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: Text(

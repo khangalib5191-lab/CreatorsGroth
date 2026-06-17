@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../core/providers/app_providers.dart';
-import '../../core/theme/app_theme.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../app/presentation/app_notifiers.dart';
 
-class CommunityDetailScreen extends StatelessWidget {
+class CommunityDetailScreen extends ConsumerWidget {
   final String communityId;
   const CommunityDetailScreen({super.key, required this.communityId});
 
   @override
-  Widget build(BuildContext context) {
-    final provider = Provider.of<CommunityProvider>(context);
-    final community = provider.communities.firstWhere((c) => c.id == communityId, orElse: () => provider.communities.first);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final communities = ref.watch(communityNotifierProvider).communities;
+    final community = communities.firstWhere(
+      (c) => c.id == communityId,
+      orElse: () => communities.first,
+    );
 
     return Scaffold(
       body: CustomScrollView(
@@ -24,7 +26,18 @@ class CommunityDetailScreen extends StatelessWidget {
                 fit: StackFit.expand,
                 children: [
                   Image.network(community.image, fit: BoxFit.cover),
-                  Container(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Colors.black.withValues(alpha: 0.7)]))),
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.7),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -35,23 +48,18 @@ class CommunityDetailScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(community.description, style: const TextStyle(color: AppTheme.textSecondary)),
+                  Text(community.description),
                   const SizedBox(height: 16),
                   Row(
                     children: [
-                      Chip(label: Text('${community.membersCount} members')),
-                      const SizedBox(width: 8),
-                      Chip(label: Text(community.category)),
+                      const Icon(Icons.people, size: 16),
+                      const SizedBox(width: 4),
+                      Text('${community.membersCount} members'),
+                      const SizedBox(width: 16),
+                      const Icon(Icons.article, size: 16),
+                      const SizedBox(width: 4),
+                      Text('${community.postsCount} posts'),
                     ],
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () {},
-                      icon: Icon(community.isJoined ? Icons.exit_to_app : Icons.add),
-                      label: Text(community.isJoined ? 'Leave Community' : 'Join Community'),
-                    ),
                   ),
                 ],
               ),

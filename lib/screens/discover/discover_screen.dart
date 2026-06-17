@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
-import '../../core/services/dummy_data.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../app/presentation/app_notifiers.dart';
 import '../../core/utils/constants.dart';
 import '../../widgets/creator_card_widget.dart';
 import '../../widgets/filter_bottom_sheet.dart';
 import '../../widgets/search_bar_widget.dart';
 import '../../widgets/niche_chip_widget.dart';
 
-class DiscoverScreen extends StatefulWidget {
+class DiscoverScreen extends ConsumerStatefulWidget {
   const DiscoverScreen({super.key});
   @override
-  State<DiscoverScreen> createState() => _DiscoverScreenState();
+  ConsumerState<DiscoverScreen> createState() => _DiscoverScreenState();
 }
 
-class _DiscoverScreenState extends State<DiscoverScreen> {
+class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   String _selectedNiche = 'All';
   String _searchQuery = '';
   Map<String, String> _filters = {
@@ -21,7 +22,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     'country': 'All Countries',
     'language': 'English',
     'followers': 'All',
-    'activity': 'All'
+    'activity': 'All',
   };
   final _searchController = TextEditingController();
 
@@ -32,7 +33,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   }
 
   List creatorsFiltered() {
-    return DummyData.suggestedCreators.where((creator) {
+    final creators = ref.read(authNotifierProvider.notifier).suggestedCreators;
+    return creators.where((creator) {
       final matchesSearch = _searchQuery.isEmpty ||
           creator.fullName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           creator.username.toLowerCase().contains(_searchQuery.toLowerCase()) ||
@@ -64,7 +66,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
               final result = await FilterBottomSheet.open(context, _filters);
               if (result != null) setState(() => _filters = result);
             },
-          )
+          ),
         ],
       ),
       body: Column(
@@ -88,16 +90,20 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
               scrollDirection: Axis.horizontal,
               children: [
                 NicheChipWidget(
-                    label: 'All',
-                    selected: _selectedNiche == 'All',
-                    onTap: () => setState(() => _selectedNiche = 'All')),
-                ...AppConstants.niches.take(8).map((niche) => Padding(
-                      padding: const EdgeInsets.only(left: 8),
-                      child: NicheChipWidget(
+                  label: 'All',
+                  selected: _selectedNiche == 'All',
+                  onTap: () => setState(() => _selectedNiche = 'All'),
+                ),
+                ...AppConstants.niches.take(8).map(
+                      (niche) => Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: NicheChipWidget(
                           label: niche,
                           selected: _selectedNiche == niche,
-                          onTap: () => setState(() => _selectedNiche = niche)),
-                    )),
+                          onTap: () => setState(() => _selectedNiche = niche),
+                        ),
+                      ),
+                    ),
               ],
             ),
           ),

@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../core/providers/app_providers.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../app/presentation/app_notifiers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/routes/app_router.dart';
 import '../../widgets/community_card_widget.dart';
 import 'groups_page.dart';
 
-class CommunityScreen extends StatefulWidget {
+class CommunityScreen extends ConsumerStatefulWidget {
   const CommunityScreen({super.key});
   @override
-  State<CommunityScreen> createState() => _CommunityScreenState();
+  ConsumerState<CommunityScreen> createState() => _CommunityScreenState();
 }
 
-class _CommunityScreenState extends State<CommunityScreen>
+class _CommunityScreenState extends ConsumerState<CommunityScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
@@ -30,7 +30,8 @@ class _CommunityScreenState extends State<CommunityScreen>
 
   @override
   Widget build(BuildContext context) {
-    final communityProvider = Provider.of<CommunityProvider>(context);
+    final communityState = ref.watch(communityNotifierProvider);
+    final chatState = ref.watch(chatNotifierProvider);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Community'),
@@ -54,21 +55,21 @@ class _CommunityScreenState extends State<CommunityScreen>
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildFeedTab(context, communityProvider),
-          _buildCommunitiesTab(context, communityProvider),
+          _buildFeedTab(context, communityState.posts),
+          _buildCommunitiesTab(context, communityState.communities),
           const GroupsPage(),
-          _buildChatTab(context),
+          _buildChatTab(context, chatState.chats),
         ],
       ),
     );
   }
 
-  Widget _buildFeedTab(BuildContext context, CommunityProvider provider) {
+  Widget _buildFeedTab(BuildContext context, List posts) {
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: provider.posts.length,
+      itemCount: posts.length,
       itemBuilder: (ctx, i) {
-        final post = provider.posts[i];
+        final post = posts[i];
         return Card(
           margin: const EdgeInsets.only(bottom: 16),
           child: Padding(
@@ -135,8 +136,7 @@ class _CommunityScreenState extends State<CommunityScreen>
     );
   }
 
-  Widget _buildCommunitiesTab(
-      BuildContext context, CommunityProvider provider) {
+  Widget _buildCommunitiesTab(BuildContext context, List communities) {
     return GridView.builder(
       padding: const EdgeInsets.all(16),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -144,19 +144,18 @@ class _CommunityScreenState extends State<CommunityScreen>
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
           childAspectRatio: 0.85),
-      itemCount: provider.communities.length,
+      itemCount: communities.length,
       itemBuilder: (ctx, i) =>
-          CommunityCardWidget(community: provider.communities[i]),
+          CommunityCardWidget(community: communities[i]),
     );
   }
 
-  Widget _buildChatTab(BuildContext context) {
-    final chatProvider = Provider.of<ChatProvider>(context);
+  Widget _buildChatTab(BuildContext context, List chats) {
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: chatProvider.chats.length,
+      itemCount: chats.length,
       itemBuilder: (ctx, i) {
-        final chat = chatProvider.chats[i];
+        final chat = chats[i];
         return ListTile(
           onTap: () => Navigator.pushNamed(context, AppRouter.chat,
               arguments: {'chatId': chat.id, 'userName': chat.userName}),

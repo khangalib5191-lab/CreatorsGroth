@@ -1,96 +1,110 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../core/providers/app_providers.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../app/presentation/app_notifiers.dart';
 import '../../core/theme/app_theme.dart';
 
-class ChatScreen extends StatefulWidget {
-  final String chatId, userName;
+class ChatScreen extends ConsumerStatefulWidget {
+  final String chatId;
+  final String userName;
   const ChatScreen({super.key, required this.chatId, required this.userName});
 
   @override
-  State<ChatScreen> createState() => _ChatScreenState();
+  ConsumerState<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _controller = TextEditingController();
+  List messages = [];
+  bool _loading = true;
 
   @override
-  void dispose() { _controller.dispose(); super.dispose(); }
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final loaded =
+        await ref.read(chatNotifierProvider.notifier).getMessages(widget.chatId);
+    if (mounted) {
+      setState(() {
+        messages = loaded;
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _send() async {
+    if (_controller.text.isEmpty) return;
+    final userId = ref.read(authNotifierProvider).user!.id;
+    await ref.read(chatNotifierProvider.notifier).sendMessage(
+          widget.chatId,
+          _controller.text,
+          userId,
+        );
+    _controller.clear();
+    await _load();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final messages = Provider.of<ChatProvider>(context).getMessages(widget.chatId);
+    final userId = ref.watch(authNotifierProvider).user?.id;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            CircleAvatar(child: Text(widget.userName[0])),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(widget.userName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                Row(children: [
-                  Container(width: 8, height: 8, decoration: const BoxDecoration(color: AppTheme.successColor, shape: BoxShape.circle)),
-                  const SizedBox(width: 6),
-                  const Text('Online', style: TextStyle(color: AppTheme.successColor, fontSize: 12)),
-                ]),
-              ],
-            ),
-          ],
-        ),
-      ),
+      appBar: AppBar(title: Text(widget.userName)),
       body: Column(
         children: [
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: messages.length,
-              itemBuilder: (ctx, i) {
-                final m = messages[i];
-                final isMe = m.senderId == 'user_1';
-                return Align(
-                  alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: isMe ? AppTheme.primaryColor : AppTheme.backgroundColor,
-                      borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(16), topRight: const Radius.circular(16),
-                        bottomLeft: Radius.circular(isMe ? 16 : 4), bottomRight: Radius.circular(isMe ? 4 : 16))),
-                    child: Text(m.content, style: TextStyle(color: isMe ? Colors.white : AppTheme.textPrimary)),
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: messages.length,
+                    itemBuilder: (ctx, i) {
+                      final m = messages[i];
+                      final isMe = m.senderId == userId;
+                      return Align(
+                        alignment:
+                            isMe ? Alignment.centerRight : Alignment.centerLeft,
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: isMe
+                                ? AppTheme.primaryColor
+                                : AppTheme.backgroundColor,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Text(
+                            m.content,
+                            style: TextStyle(
+                              color: isMe ? Colors.white : AppTheme.textPrimary,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                );
-              },
-            ),
           ),
-          Container(
-            padding: EdgeInsets.only(left: 16, right: 16, bottom: MediaQuery.of(context).padding.bottom + 8),
+          Padding(
+            padding: const EdgeInsets.all(16),
             child: Row(
               children: [
                 Expanded(
                   child: TextField(
                     controller: _controller,
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                       hintText: 'Type a message...',
-                      filled: true,
-                      fillColor: AppTheme.backgroundColor,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                FloatingActionButton(
-                  onPressed: () {
-                    if (_controller.text.isNotEmpty) {
-                      Provider.of<ChatProvider>(context, listen: false).sendMessage(widget.chatId, _controller.text, 'user_1');
-                      _controller.clear();
-                    }
-                  },
-                  child: const Icon(Icons.send),
-                ),
+                IconButton(icon: const Icon(Icons.send), onPressed: _send),
               ],
             ),
           ),

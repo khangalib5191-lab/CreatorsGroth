@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../core/providers/app_providers.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../app/presentation/app_notifiers.dart';
+import '../../core/config/app_config.dart';
+import '../../core/utils/business_logic.dart';
 import '../../core/utils/constants.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/models/task_model.dart';
+import '../../features/task/domain/entities/task_entity.dart';
 
-class CreateTaskScreen extends StatefulWidget {
+class CreateTaskScreen extends ConsumerStatefulWidget {
   const CreateTaskScreen({super.key});
   @override
-  State<CreateTaskScreen> createState() => _CreateTaskScreenState();
+  ConsumerState<CreateTaskScreen> createState() => _CreateTaskScreenState();
 }
 
-class _CreateTaskScreenState extends State<CreateTaskScreen> {
+class _CreateTaskScreenState extends ConsumerState<CreateTaskScreen> {
   final _titleController = TextEditingController();
   final _linkController = TextEditingController();
   final _instructionsController = TextEditingController();
@@ -20,23 +22,65 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
   String _platform = 'YouTube';
   String _niche = 'Technology';
   int _reward = 10;
-  int _verificationReward = 3;
   int _participants = 50;
+  bool _isSubmitting = false;
 
-  int get _totalCost => (_reward + _verificationReward) * _participants;
+  late final TaskCostCalculator _calculator = TaskCostCalculator(
+    platformFeePercent: AppConfig.platformFeePercent,
+  );
+
+  int get _totalCredits =>
+      _calculator.totalCreditsRequired(_reward, _participants);
+  int get _platformFee => _calculator.platformFee(_reward, _participants);
+  int get _finalCost => _calculator.finalCost(_reward, _participants);
 
   @override
   void dispose() {
     _titleController.dispose();
     _linkController.dispose();
+    _instructionsController.dispose();
     super.dispose();
+  }
+
+  Future<void> _createTask() async {
+    if (_titleController.text.isEmpty || _linkController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Title and task link are required')),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    final request = CreateTaskRequest(
+      title: _titleController.text,
+      description: _instructionsController.text.isNotEmpty
+          ? _instructionsController.text
+          : 'Complete the task to earn credits.',
+      taskType: _taskType,
+      platform: _platform,
+      niche: _niche,
+      taskLink: _linkController.text.trim(),
+      thumbnail: '',
+      rewardPerParticipant: _reward,
+      participantCount: _participants,
+      category: _taskCategory,
+    );
+
+    final error = await ref.read(taskNotifierProvider.notifier).createTask(request);
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
+
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+    } else {
+      Navigator.pop(context);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final userProvider = Provider.of<UserProvider>(context);
-    final user = userProvider.currentUser!;
-    final canAfford = user.credits >= _totalCost;
+    final user = ref.watch(authNotifierProvider).user!;
+    final canAfford = user.credits >= _finalCost;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Create Task')),
@@ -48,39 +92,54 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                      colors: [AppTheme.primaryColor, AppTheme.secondaryColor]),
-                  borderRadius: BorderRadius.circular(16)),
+                gradient: const LinearGradient(
+                  colors: [AppTheme.primaryColor, AppTheme.secondaryColor],
+                ),
+                borderRadius: BorderRadius.circular(16),
+              ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Available Credits',
-                            style:
-                                TextStyle(color: Colors.white70, fontSize: 12)),
-                        Text('${user.credits}',
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 28,
-                                fontWeight: FontWeight.bold)),
-                      ]),
-                  const Icon(Icons.account_balance_wallet,
-                      color: Colors.white, size: 40),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Available Credits',
+                        style: TextStyle(color: Colors.white70, fontSize: 12),
+                      ),
+                      Text(
+                        '${user.credits}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Icon(
+                    Icons.account_balance_wallet,
+                    color: Colors.white,
+                    size: 40,
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: 24),
             TextField(
-                controller: _titleController,
-                decoration: const InputDecoration(
-                    labelText: 'Task Title', prefixIcon: Icon(Icons.title))),
+              controller: _titleController,
+              decoration: const InputDecoration(
+                labelText: 'Task Title',
+                prefixIcon: Icon(Icons.title),
+              ),
+            ),
             const SizedBox(height: 16),
             DropdownButtonFormField(
               initialValue: _taskCategory,
               decoration: const InputDecoration(
-                  labelText: 'Task Category', prefixIcon: Icon(Icons.folder)),
+                labelText: 'Task Category',
+                prefixIcon: Icon(Icons.folder),
+              ),
               items: AppConstants.taskCategories
                   .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                   .toList(),
@@ -90,7 +149,9 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
             DropdownButtonFormField(
               initialValue: _taskType,
               decoration: const InputDecoration(
-                  labelText: 'Task Type', prefixIcon: Icon(Icons.category)),
+                labelText: 'Task Type',
+                prefixIcon: Icon(Icons.category),
+              ),
               items: AppConstants.taskTypes
                   .map((t) => DropdownMenuItem(value: t, child: Text(t)))
                   .toList(),
@@ -100,7 +161,9 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
             DropdownButtonFormField(
               initialValue: _platform,
               decoration: const InputDecoration(
-                  labelText: 'Platform', prefixIcon: Icon(Icons.devices)),
+                labelText: 'Platform',
+                prefixIcon: Icon(Icons.devices),
+              ),
               items: AppConstants.platforms
                   .map((p) => DropdownMenuItem(value: p, child: Text(p)))
                   .toList(),
@@ -110,7 +173,9 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
             DropdownButtonFormField(
               initialValue: _niche,
               decoration: const InputDecoration(
-                  labelText: 'Niche', prefixIcon: Icon(Icons.label)),
+                labelText: 'Niche',
+                prefixIcon: Icon(Icons.label),
+              ),
               items: AppConstants.niches
                   .map((n) => DropdownMenuItem(value: n, child: Text(n)))
                   .toList(),
@@ -118,141 +183,58 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
             ),
             const SizedBox(height: 16),
             TextField(
-                controller: _linkController,
-                decoration: const InputDecoration(
-                    labelText: 'Task Link', prefixIcon: Icon(Icons.link))),
+              controller: _linkController,
+              decoration: const InputDecoration(
+                labelText: 'Target Link',
+                prefixIcon: Icon(Icons.link),
+              ),
+            ),
             const SizedBox(height: 16),
             TextField(
               controller: _instructionsController,
               decoration: const InputDecoration(
-                  labelText: 'Instructions',
-                  prefixIcon: Icon(Icons.description)),
+                labelText: 'Description',
+                prefixIcon: Icon(Icons.description),
+              ),
               maxLines: 4,
             ),
             const SizedBox(height: 24),
-            Text('Reward Settings',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    children: [
-                      const Text('Reward/User'),
-                      Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            IconButton(
-                                icon: const Icon(Icons.remove),
-                                onPressed: _reward > 5
-                                    ? () => setState(() => _reward -= 5)
-                                    : null),
-                            Text('$_reward',
-                                style: Theme.of(context).textTheme.titleLarge),
-                            IconButton(
-                                icon: const Icon(Icons.add),
-                                onPressed: _reward < 100
-                                    ? () => setState(() => _reward += 5)
-                                    : null),
-                          ]),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: Column(
-                    children: [
-                      const Text('Verification'),
-                      Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            IconButton(
-                                icon: const Icon(Icons.remove),
-                                onPressed: _verificationReward > 1
-                                    ? () =>
-                                        setState(() => _verificationReward--)
-                                    : null),
-                            Text('$_verificationReward',
-                                style: Theme.of(context).textTheme.titleLarge),
-                            IconButton(
-                                icon: const Icon(Icons.add),
-                                onPressed: _verificationReward < 10
-                                    ? () =>
-                                        setState(() => _verificationReward++)
-                                    : null),
-                          ]),
-                    ],
-                  ),
-                ),
-              ],
+            Text(
+              'Reward Per Participant: $_reward credits',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 16),
+            Slider(
+              value: _reward.toDouble(),
+              min: 5,
+              max: 100,
+              divisions: 19,
+              onChanged: (v) => setState(() => _reward = v.round()),
+            ),
             Text('Participants: $_participants'),
             Slider(
-                value: _participants.toDouble(),
-                min: 10,
-                max: 500,
-                divisions: 49,
-                onChanged: (v) => setState(() => _participants = v.round())),
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                  color: AppTheme.backgroundColor,
-                  borderRadius: BorderRadius.circular(12)),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Total Cost',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                  Text('$_totalCost Credits',
-                      style: TextStyle(
-                          color: canAfford
-                              ? AppTheme.successColor
-                              : AppTheme.errorColor,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18)),
-                ],
-              ),
+              value: _participants.toDouble(),
+              min: 10,
+              max: 500,
+              divisions: 49,
+              onChanged: (v) => setState(() => _participants = v.round()),
             ),
+            const SizedBox(height: 16),
+            _costRow('Task Cost', '$_totalCredits credits'),
+            _costRow('Platform Fee (${AppConfig.platformFeePercent.toInt()}%)',
+                '$_platformFee credits'),
+            _costRow('Escrow Lock (Total)', '$_finalCost credits', bold: true),
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
               height: 56,
               child: ElevatedButton(
-                onPressed: canAfford
-                    ? () {
-                        userProvider.spendCredits(_totalCost);
-                        final task = TaskModel(
-                          id: 'task_${DateTime.now().millisecondsSinceEpoch}',
-                          title: _titleController.text,
-                          description: _instructionsController.text.isNotEmpty
-                              ? _instructionsController.text
-                              : 'Complete the task to earn credits.',
-                          category: _taskCategory,
-                          taskType: _taskType,
-                          platform: _platform,
-                          niche: _niche,
-                          taskLink: _linkController.text,
-                          thumbnail:
-                              'https://images.pexels.com/photos/607812/pexels-photo-607812.jpeg?w=400',
-                          reward: _reward,
-                          verificationReward: _verificationReward,
-                          participantsNeeded: _participants,
-                          creatorId: user.id,
-                          creatorName: user.fullName,
-                          creatorImage: user.profileImage,
-                          createdAt: DateTime.now(),
-                        );
-                        Provider.of<TaskProvider>(context, listen: false)
-                            .addTask(task);
-                        userProvider.createTask();
-                        Navigator.pop(context);
-                      }
-                    : null,
-                child: Text(canAfford ? 'Create Task' : 'Insufficient Credits'),
+                onPressed: canAfford && !_isSubmitting ? _createTask : null,
+                child: _isSubmitting
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : Text(canAfford ? 'Create Task' : 'Insufficient Credits'),
               ),
             ),
           ],
@@ -260,4 +242,21 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
       ),
     );
   }
+
+  Widget _costRow(String label, String value, {bool bold = false}) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label,
+                style: TextStyle(
+                  fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+                )),
+            Text(value,
+                style: TextStyle(
+                  fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+                )),
+          ],
+        ),
+      );
 }

@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../app/presentation/app_notifiers.dart';
 import '../../core/models/user_model.dart';
-import '../../core/providers/app_providers.dart';
 import '../../core/routes/app_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../widgets/task_card_widget.dart';
 import '../../widgets/filter_bottom_sheet.dart';
 import '../../widgets/search_bar_widget.dart';
 
-class TasksScreen extends StatefulWidget {
+class TasksScreen extends ConsumerStatefulWidget {
   const TasksScreen({super.key});
   @override
-  State<TasksScreen> createState() => _TasksScreenState();
+  ConsumerState<TasksScreen> createState() => _TasksScreenState();
 }
 
-class _TasksScreenState extends State<TasksScreen>
+class _TasksScreenState extends ConsumerState<TasksScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final _searchController = TextEditingController();
@@ -41,8 +41,8 @@ class _TasksScreenState extends State<TasksScreen>
     super.dispose();
   }
 
-  List _filteredTasks(TaskProvider provider) {
-    return provider.tasks.where((task) {
+  List _filteredTasks(List tasks) {
+    return tasks.where((task) {
       final query = _searchQuery.toLowerCase();
       return query.isEmpty ||
           task.title.toLowerCase().contains(query) ||
@@ -53,9 +53,9 @@ class _TasksScreenState extends State<TasksScreen>
 
   @override
   Widget build(BuildContext context) {
-    final taskProvider = Provider.of<TaskProvider>(context);
-    final user = Provider.of<UserProvider>(context).currentUser!;
-    final tasks = _filteredTasks(taskProvider);
+    final taskState = ref.watch(taskNotifierProvider);
+    final user = ref.watch(authNotifierProvider).user!;
+    final tasks = _filteredTasks(taskState.tasks);
 
     return Scaffold(
       appBar: AppBar(
@@ -102,9 +102,9 @@ class _TasksScreenState extends State<TasksScreen>
             child: TabBarView(
               controller: _tabController,
               children: [
-                _buildAvailableTab(context, taskProvider, tasks),
+                _buildAvailableTab(context, tasks),
                 _buildMyTasksTab(context, user),
-                _buildReviewTab(context, taskProvider),
+                _buildReviewTab(context, taskState.pendingProofs),
               ],
             ),
           ),
@@ -118,8 +118,7 @@ class _TasksScreenState extends State<TasksScreen>
     );
   }
 
-  Widget _buildAvailableTab(
-          BuildContext context, TaskProvider provider, List tasks) =>
+  Widget _buildAvailableTab(BuildContext context, List tasks) =>
       tasks.isEmpty
           ? const Center(child: Text('No tasks found'))
           : ListView.builder(
@@ -143,15 +142,15 @@ class _TasksScreenState extends State<TasksScreen>
         ]),
       );
 
-  Widget _buildReviewTab(BuildContext context, TaskProvider provider) {
-    if (provider.pendingProofs.isEmpty) {
+  Widget _buildReviewTab(BuildContext context, List pendingProofs) {
+    if (pendingProofs.isEmpty) {
       return const Center(child: Text('No pending reviews'));
     }
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: provider.pendingProofs.length,
+      itemCount: pendingProofs.length,
       itemBuilder: (ctx, i) {
-        final proof = provider.pendingProofs[i];
+        final proof = pendingProofs[i];
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
           child: Padding(
@@ -187,7 +186,9 @@ class _TasksScreenState extends State<TasksScreen>
                   children: [
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () => provider.approveProof(proof.id),
+                        onPressed: () => ref
+                            .read(taskNotifierProvider.notifier)
+                            .approveProof(proof.id),
                         style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.successColor),
                         child: const Text('Approve'),
@@ -196,7 +197,9 @@ class _TasksScreenState extends State<TasksScreen>
                     const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () => provider.rejectProof(proof.id),
+                        onPressed: () => ref
+                            .read(taskNotifierProvider.notifier)
+                            .rejectProof(proof.id),
                         style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.errorColor),
                         child: const Text('Reject'),
